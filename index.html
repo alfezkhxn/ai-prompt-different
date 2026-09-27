@@ -109,6 +109,14 @@ nav{display:flex;justify-content:space-between;align-items:center;background:rgb
 .modal-info h3{background:linear-gradient(90deg,#c084fc,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:800}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(120px);background:linear-gradient(135deg,#fff,#e5e7eb);color:#000;padding:12px 22px;border-radius:100px;font-weight:800;transition:.4s cubic-bezier(.68,-.55,.27,1.55);z-index:999;box-shadow:0 10px 30px rgba(0,0,0,.3)}
 .toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ⬇️ NEW: Highlight Effect For Specific Photo ⬇️ */
+.card.highlight {
+  border: 2px solid #facc15 !important; /* Bright Yellow Border */
+  box-shadow: 0 0 30px rgba(250, 204, 21, 0.6) !important; /* Glowing Effect */
+  transform: scale(1.03); /* Slightly bigger to show focus */
+  z-index: 10;
+}
 </style>
 </head>
 <body>
@@ -163,26 +171,44 @@ function render(list){
   list.forEach(d=>{
     const imgSrc = d.imageUrl || d.image || "";
     const div=document.createElement('div');
+    
+    // ⬇️ CHANGE: Added unique ID to each card for scrolling
     div.className='card';
-    div.innerHTML=`<img src="${imgSrc}" loading="lazy" onclick="openModal('${imgSrc}','${d.category}','${d.prompt.replace(/'/g,"\\'")}')"><div class="card-body"><div class="cat">📋 ${d.category}</div><p class="prompt">${d.prompt}</p><div class="actions"><button class="btn btn-copy" onclick="copyPrompt(\`${d.prompt.replace(/`/g,'')}\`)">📋 Copy</button><button class="btn btn-del ${isAdmin()?'show':''}" onclick="deleteCard('${d.id}')">🗑️</button></div></div>`;
+    div.id = `photo-${d.id}`; 
+    
+    div.innerHTML=`<img src="${imgSrc}" loading="lazy" onclick="openModal('${imgSrc}','${d.category}','${d.prompt.replace(/'/g,"\\'")}')"><div class="card-body"><div class="cat">📋 ${d.category}</div><p class="prompt">${d.prompt}</p><div class="actions"><button class="btn btn-copy" onclick="copyPrompt(\`${d.prompt.replace(/`/g,'')}\`)">📋 Copy</button><button class="btn-del ${isAdmin()?'show':''}" onclick="deleteCard('${d.id}')">🗑️</button></div></div>`;
     gallery.appendChild(div);
   });
 }
 
-// FIXED: Direct Photo Link Logic (No Reload, Opens Popup)
+// ⬇️ CHANGE: New Logic to Scroll & Highlight instead of just opening modal
 function checkDeepLink(){
   if(deepLinkProcessed) return;
   const params = new URLSearchParams(window.location.search);
   const id = params.get('id');
+  
   if(id && allData.length){
     const found = allData.find(p=>p.id===id);
     if(found){
       deepLinkProcessed = true;
-      const imgSrc = found.imageUrl || found.image || "";
-      setTimeout(()=> {
-        openModal(imgSrc, found.category, found.prompt);
-        window.history.replaceState(null, null, window.location.pathname);
-      }, 1000);
+      
+      // Wait for DOM to fully render cards
+      setTimeout(() => {
+        const element = document.getElementById(`photo-${id}`);
+        
+        if(element) {
+          // 1. Smooth Scroll to center of screen
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          // 2. Add Highlight Class (Yellow Glow)
+          element.classList.add('highlight');
+          
+          // Optional: Remove highlight after 5 seconds so it doesn't stay forever
+          setTimeout(() => {
+             element.classList.remove('highlight');
+          }, 5000);
+        }
+      }, 800); 
     }
   }
 }
@@ -195,7 +221,7 @@ function applyFilter(){
   const q=search.value.toLowerCase();
   if(q) f=f.filter(x=>x.prompt.toLowerCase().includes(q)||x.category.toLowerCase().includes(q));
   render(f);
-  checkDeepLink();
+  checkDeepLink(); // Call this after rendering
 }
 
 document.querySelectorAll('.fpill').forEach(p=>p.onclick=()=>{document.querySelectorAll('.fpill').forEach(x=>x.classList.remove('active')); p.classList.add('active'); activeCat=p.dataset.cat; applyFilter();});
@@ -212,4 +238,4 @@ load();
   <p style="color:#888; font-size:.85rem; margin-top:20px;">📩 alexushshshs@gmail.com</p>
 </footer>
 </body>
-  </html>
+                                                                                                                                                                                                                                    </html>
