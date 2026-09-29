@@ -59,7 +59,7 @@ nav{display:flex;justify-content:space-between;align-items:center;background:rgb
 .card::before{content:'';position:absolute;inset:0;border-radius:22px;padding:1px;background:linear-gradient(135deg, rgba(139,92,246,.4), rgba(59,130,246,.2), rgba(236,72,153,.3));-webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .4s;pointer-events:none}
 .card:hover::before{opacity:1}
 .card:hover{transform:translateY(-8px);box-shadow:0 25px 50px rgba(139,92,246,.25);border-color:rgba(139,92,246,.4)}
-.card img{width:100%;display:block;cursor:pointer;transition:.6s cubic-bezier(.4,0,.2,1)}
+.card img{width:100%;display:block;cursor:pointer;transition:.6s cubic-bezier(.4,0,.2,1);background:#1a1435}
 .card:hover img{transform:scale(1.08)}
 .card-body{padding:14px}
 .cat{font-size:.68rem;letter-spacing:.5px;color:#a78bfa;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.25);padding:4px 8px;border-radius:100px;display:inline-block;margin-bottom:8px}
@@ -109,7 +109,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebas
 import { getFirestore, collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 const firebaseConfig = { apiKey: "AIzaSyBPvoo4ro_ZcTb8b4R0hjSpkmIFdwZ8R3A", authDomain: "ai-prompt-vault-e81ab.firebaseapp.com", projectId: "ai-prompt-vault-e81ab", storageBucket: "ai-prompt-vault-e81ab.firebasestorage.app", messagingSenderId: "191570252019", appId: "1:191570252019:web:c9c8277ee0517496e5a786" };
 const app = initializeApp(firebaseConfig); const db = getFirestore(app);
-const IMGBB = "a494b7fff5c7c929b19f0998d4c44f38"; const PASS = "New_alfez";
+const IMGBB = "f2bc8c696079631a3204f021341771f4"; const PASS = "New_alfez";
 let allData = []; let activeCat = "All"; let deepLinkProcessed = false;
 const gallery=document.getElementById('gallery'), adminBtn=document.getElementById('adminBtn'), uploadBox=document.getElementById('uploadBox'), imageInput=document.getElementById('imageInput'), preview=document.getElementById('preview'), promptInput=document.getElementById('promptInput'), categoryInput=document.getElementById('categoryInput'), uploadBtn=document.getElementById('uploadBtn'), search=document.getElementById('search');
 let file=null;
@@ -134,7 +134,7 @@ function render(list){
     const div=document.createElement('div');
     div.className='card';
     div.id = `photo-${d.id}`;
-    div.innerHTML=`<img src="${imgSrc}" loading="lazy" onclick="openModal('${imgSrc}','${d.category}','${d.prompt.replace(/'/g,"\\'")}')"><div class="card-body"><div class="cat">📋 ${d.category}</div><p class="prompt">${d.prompt}</p><div class="actions"><button class="btn btn-copy" onclick="copyPrompt(\`${d.prompt.replace(/`/g,'')}\`)">📋 Copy</button><button class="btn btn-del ${isAdmin()?'show':''}" onclick="deleteCard('${d.id}')">🗑️</button></div></div>`;
+    div.innerHTML=`<img src="${imgSrc}" loading="lazy" decoding="async" onclick="openModal('${imgSrc}','${d.category}','${d.prompt.replace(/'/g,"\\'")}')"><div class="card-body"><div class="cat">📋 ${d.category}</div><p class="prompt">${d.prompt}</p><div class="actions"><button class="btn btn-copy" onclick="copyPrompt(\`${d.prompt.replace(/`/g,'')}\`)">📋 Copy</button><button class="btn btn-del ${isAdmin()?'show':''}" onclick="deleteCard('${d.id}')">🗑️</button></div></div>`;
     gallery.appendChild(div);
   });
 }
@@ -143,20 +143,29 @@ function checkDeepLink(){
   if(deepLinkProcessed) return;
   const params = new URLSearchParams(window.location.search);
   const id = params.get('id');
-  if(id && allData.length){
-    const found = allData.find(p=>p.id===id);
-    if(found){
-      deepLinkProcessed = true;
-      setTimeout(() => {
-        const element = document.getElementById(`photo-${id}`);
-        if(element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          element.classList.add('highlight');
-          setTimeout(() => { element.classList.remove('highlight'); }, 5000);
-        }
-      }, 800);
-    }
-  }
+  if(!id || !allData.length) return;
+  const found = allData.find(p=>p.id===id);
+  if(!found) return;
+  deepLinkProcessed = true;
+  const waitForImages = (maxWait = 4000) => {
+    const startTime = Date.now();
+    const checkInterval = setInterval(() => {
+      const element = document.getElementById(`photo-${id}`);
+      const allImagesLoaded = Array.from(document.querySelectorAll('.card img')).every(img => img.complete);
+      if(element && (allImagesLoaded || Date.now() - startTime > maxWait)){
+        clearInterval(checkInterval);
+        setTimeout(() => {
+          const el = document.getElementById(`photo-${id}`);
+          if(el){
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('highlight');
+            setTimeout(() => el.classList.remove('highlight'), 5000);
+          }
+        }, 200);
+      }
+    }, 300);
+  };
+  waitForImages();
 }
 
 async function load(){
@@ -165,12 +174,20 @@ async function load(){
     allData=[];
     snap.forEach(doc=>allData.push({id:doc.id,...doc.data()}));
     allData.reverse();
-    const uniqueCategories = [...new Set(allData.map(item => item.category))].sort();
-    let filtersHTML = '<div class="fpill active" data-cat="All">All</div>';
-    uniqueCategories.forEach(cat => {
-      if(cat && cat !== "") {
-         filtersHTML += `<div class="fpill" data-cat="${cat}">${cat}</div>`;
+    const categoryMap = {};
+    allData.forEach(item => {
+      if (item.category && item.category.trim() !== "") {
+        let key = item.category.trim().toLowerCase();
+        if (!categoryMap[key]) {
+          categoryMap[key] = key.charAt(0).toUpperCase() + key.slice(1);
+        }
       }
+    });
+    const uniqueCategories = Object.keys(categoryMap).sort();
+    let filtersHTML = '<div class="fpill active" data-cat="All">All</div>';
+    uniqueCategories.forEach(key => {
+      let displayName = categoryMap[key];
+      filtersHTML += `<div class="fpill" data-cat="${key}">${displayName}</div>`;
     });
     document.getElementById('filters').innerHTML = filtersHTML;
     document.querySelectorAll('.fpill').forEach(p=>{
@@ -187,7 +204,9 @@ async function load(){
 
 function applyFilter(){
   let f=[...allData];
-  if(activeCat!=='All') f=f.filter(x=>x.category===activeCat);
+  if(activeCat!=='All'){
+    f=f.filter(x=>x.category && x.category.trim().toLowerCase()===activeCat.toLowerCase());
+  }
   const q=search.value.toLowerCase();
   if(q) f=f.filter(x=>x.prompt.toLowerCase().includes(q)||x.category.toLowerCase().includes(q));
   render(f);
