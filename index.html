@@ -96,7 +96,19 @@ nav{display:flex;justify-content:space-between;align-items:center;background:rgb
 <div style="display:flex;gap:12px;align-items:center;margin-bottom:18px"><div style="width:46px;height:46px;background:linear-gradient(135deg,#8b5cf6,#3b82f6);border-radius:14px;display:flex;align-items:center;justify-content:center">☁️</div><div><h3 style="font-size:1rem">Upload HD</h3><p style="color:#888;font-size:.8rem">Original quality • 32MB max</p></div></div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
 <label style="border:2px dashed rgba(139,92,246,.4);border-radius:20px;padding:20px;text-align:center;cursor:pointer;background:rgba(139,92,246,.06)"><div style="font-size:1.6rem">⬆️</div><div style="font-size:.85rem;margin-top:6px">Click to upload</div><img id="preview" style="display:none;width:100%;margin-top:10px;border-radius:12px"><input type="file" id="imageInput" accept="image/*" hidden></label>
-<div><textarea id="promptInput" placeholder="Enter detailed prompt..." style="width:100%;min-height:130px;background:rgba(0,0,0,.3);border:1px solid rgba(139,92,246,.25);border-radius:16px;padding:12px;color:#fff;resize:none"></textarea><select id="categoryInput" style="width:100%;margin-top:10px;background:rgba(0,0,0,.3);border:1px solid rgba(139,92,246,.25);border-radius:12px;padding:10px;color:#fff"><option>Fantasy</option><option selected>Portrait</option><option>Nature</option><option>Sci-Fi</option><option>Anime</option><option>Other</option></select></div>
+<div><textarea id="promptInput" placeholder="Enter detailed prompt..." style="width:100%;min-height:130px;background:rgba(0,0,0,.3);border:1px solid rgba(139,92,246,.25);border-radius:16px;padding:12px;color:#fff;resize:none"></textarea>
+<input type="text" id="categoryInput" list="categoryOptions" placeholder="Category (e.g. Cute, Glamour)" style="width:100%;margin-top:10px;background:rgba(0,0,0,.3);border:1px solid rgba(139,92,246,.25);border-radius:12px;padding:10px;color:#fff">
+<datalist id="categoryOptions">
+  <option>Fantasy</option>
+  <option>Portrait</option>
+  <option>Nature</option>
+  <option>Sci-Fi</option>
+  <option>Anime</option>
+  <option>General</option>
+  <option>Cute</option>
+  <option>Glamour</option>
+</datalist>
+</div>
 </div>
 <button id="uploadBtn" style="width:100%;margin-top:16px;padding:14px;border:none;border-radius:100px;background:linear-gradient(90deg,#8b5cf6,#3b82f6);color:#fff;font-weight:800;cursor:pointer">✨ Upload to Gallery</button>
 </div>
@@ -119,7 +131,7 @@ function isAdmin(){return localStorage.getItem('isAdmin')==='true'}
 function checkAdmin(){if(isAdmin()){uploadBox.classList.add('active'); adminBtn.textContent='✅ Admin';}}
 checkAdmin();
 adminBtn.onclick=()=>{if(isAdmin()){if(confirm('Logout?')){localStorage.removeItem('isAdmin'); uploadBox.classList.remove('active'); adminBtn.textContent='🔐 Admin'; load();}} else { const p=prompt('Password:'); if(p===PASS){localStorage.setItem('isAdmin','true'); uploadBox.classList.add('active'); adminBtn.textContent='✅ Admin'; toast('Admin login!'); load();} else if(p) toast('Wrong password');}};
-uploadBtn.onclick=async()=>{if(!file) return toast('Photo select karo'); if(!promptInput.value.trim()) return toast('Prompt likho'); uploadBtn.disabled=true; uploadBtn.textContent='⏳ Uploading HD...'; try{ const fd=new FormData(); fd.append('image',file); const res=await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB}`,{method:'POST',body:fd}); const j=await res.json(); if(!j.success) throw new Error('Upload fail'); await addDoc(collection(db,'prompts'),{image:j.data.url,prompt:promptInput.value.trim(),category:categoryInput.value,createdAt:serverTimestamp()}); toast('🎉 Uploaded!'); file=null; preview.style.display='none'; promptInput.value=''; load(); }catch(e){toast(e.message)} finally{uploadBtn.disabled=false; uploadBtn.textContent='✨ Upload to Gallery'}};
+uploadBtn.onclick=async()=>{if(!file) return toast('Photo select karo'); if(!promptInput.value.trim()) return toast('Prompt likho'); if(!categoryInput.value.trim()) return toast('Category likho'); uploadBtn.disabled=true; uploadBtn.textContent='⏳ Uploading HD...'; try{ const fd=new FormData(); fd.append('image',file); const res=await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB}`,{method:'POST',body:fd}); const j=await res.json(); if(!j.success) throw new Error('Upload fail'); const catValue = categoryInput.value.trim(); await addDoc(collection(db,'prompts'),{image:j.data.url,prompt:promptInput.value.trim(),category:catValue,createdAt:serverTimestamp()}); toast('🎉 Uploaded!'); file=null; preview.style.display='none'; promptInput.value=''; categoryInput.value=''; load(); }catch(e){toast(e.message)} finally{uploadBtn.disabled=false; uploadBtn.textContent='✨ Upload to Gallery'}};
 window.copyPrompt=(t)=>{navigator.clipboard.writeText(t); toast('✅ Prompt copied!');};
 window.deleteCard=async(id)=>{if(!isAdmin()) return toast('Admin only'); if(!confirm('Delete?')) return; await deleteDoc(doc(db,'prompts',id)); toast('Deleted'); load();};
 window.openModal=(img,cat,prompt)=>{document.getElementById('modalImg').src=img; document.getElementById('modalCat').textContent=cat; document.getElementById('modalPrompt').textContent=prompt; document.getElementById('modalDown').href=img; document.getElementById('modal').classList.add('open'); document.getElementById('modalCopy').onclick=()=>copyPrompt(prompt); window.history.replaceState(null,null,`?id=${allData.find(x=>(x.imageUrl||x.image)===img)?.id||''}`);};
@@ -190,6 +202,16 @@ async function load(){
       filtersHTML += `<div class="fpill" data-cat="${key}">${displayName}</div>`;
     });
     document.getElementById('filters').innerHTML = filtersHTML;
+    
+    // Update datalist options automatically from Firestore
+    const datalist = document.getElementById('categoryOptions');
+    if(datalist) {
+      datalist.innerHTML = '';
+      uniqueCategories.forEach(key => {
+        datalist.innerHTML += `<option>${categoryMap[key]}</option>`;
+      });
+    }
+    
     document.querySelectorAll('.fpill').forEach(p=>{
        p.onclick=()=>{
          document.querySelectorAll('.fpill').forEach(x=>x.classList.remove('active'));
@@ -220,10 +242,4 @@ load();
   <h2 style="font-size:1.6rem; font-weight:800; background:linear-gradient(90deg,#fde047,#fb7185,#c084fc,#60a5fa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:10px;">Join Our Telegram Family</h2>
   <p style="color:#9ca3af; font-size:.9rem; margin-bottom:22px;">Daily 50+ HD Prompts • Free Download • No Watermark</p>
   <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-    <a href="https://t.me/AiPromptdifferent" target="_blank" style="display:inline-flex; align-items:center; gap:8px; background:linear-gradient(90deg,#3b82f6,#7c3aed); color:#fff; padding:14px 28px; border-radius:100px; text-decoration:none; font-weight:800;">✈️ Join Telegram</a>
-    <a href="mailto:alexushshshs@gmail.com" style="display:inline-flex; align-items:center; gap:8px; background:#fff; color:#000; padding:14px 28px; border-radius:100px; text-decoration:none; font-weight:800;">📧 Contact Us</a>
-  </div>
-  <p style="color:#888; font-size:.85rem; margin-top:20px;">📩 alexushshshs@gmail.com</p>
-</footer>
-</body>
-                                                                                                                                                                                             </html>
+    <a href="https://t.me/AiPromptdifferent" target="_blank" style="display:inline-flex; align-items:center; gap:8px; background:linear-gradient(90deg,#3b82f6,#7c3aed); color:#fff; padding:14px 28px; border
