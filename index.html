@@ -23,7 +23,7 @@
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
-/* Smooth Scrolling & Basic Setup */
+/* Smooth Scrolling & Setup */
 html { scroll-behavior: smooth; }
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Plus Jakarta Sans',sans-serif;background:#07050f;color:#fff;min-height:100vh;overflow-x:hidden}
@@ -200,7 +200,6 @@ nav{display:flex;justify-content:space-between;align-items:center;background:rgb
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-// Keep your keys safe (they are included here as you provided them)
 const firebaseConfig = { apiKey: "AIzaSyBPvoo4ro_ZcTb8b4R0hjSpkmIFdwZ8R3A", authDomain: "ai-prompt-vault-e81ab.firebaseapp.com", projectId: "ai-prompt-vault-e81ab", storageBucket: "ai-prompt-vault-e81ab.firebasestorage.app", messagingSenderId: "191570252019", appId: "1:191570252019:web:c9c8277ee0517496e5a786" };
 const app = initializeApp(firebaseConfig); const db = getFirestore(app);
 const IMGBB = "f2bc8c696079631a3204f021341771f4"; const PASS = "New_alfez";
@@ -229,9 +228,39 @@ uploadBtn.onclick=async()=>{if(!file) return toast('Photo select karo'); if(!pro
 window.copyPrompt=(t)=>{navigator.clipboard.writeText(t); toast('✅ Prompt copied!');};
 window.deleteCard=async(id)=>{if(!isAdmin()) return toast('Admin only'); if(!confirm('Delete?')) return; await deleteDoc(doc(db,'prompts',id)); toast('Deleted'); load();};
 
-window.openModal=(img,cat,prompt)=>{document.getElementById('modalImg').src=img; document.getElementById('modalCat').textContent=cat; document.getElementById('modalPrompt').textContent=prompt; document.getElementById('modalDown').href=img; document.getElementById('modal').classList.add('open'); document.getElementById('modalCopy').onclick=()=>copyPrompt(prompt); window.history.replaceState(null,null,`?id=${allData.find(x=>(x.imageUrl||x.image)===img)?.id||''}`);};
-window.closeModal=()=>{document.getElementById('modal').classList.remove('open'); window.history.replaceState(null,null,window.location.pathname);};
-document.getElementById('modal').onclick=e=>{if(e.target.id==='modal') closeModal()};
+/* --- MOBILE BACK BUTTON FIX (MODAL OPEN & CLOSE LOGIC) --- */
+window.openModal = (img, cat, prompt) => {
+  document.getElementById('modalImg').src = img; 
+  document.getElementById('modalCat').textContent = cat; 
+  document.getElementById('modalPrompt').textContent = prompt; 
+  document.getElementById('modalDown').href = img; 
+  document.getElementById('modal').classList.add('open'); 
+  document.getElementById('modalCopy').onclick = () => copyPrompt(prompt); 
+  
+  // Save state to browser history when modal opens
+  const photoId = allData.find(x => (x.imageUrl || x.image) === img)?.id || '';
+  window.history.pushState({ modalOpen: true }, "", `?id=${photoId}`);
+};
+
+window.closeModal = () => {
+  // If we have state, trigger the back button to clean up history and close modal
+  if (window.history.state && window.history.state.modalOpen) {
+    window.history.back(); 
+  } else {
+    document.getElementById('modal').classList.remove('open'); 
+    window.history.replaceState(null, null, window.location.pathname);
+  }
+};
+
+document.getElementById('modal').onclick = e => { if(e.target.id === 'modal') closeModal(); };
+
+// Listen for mobile back button press
+window.addEventListener('popstate', (e) => {
+  if (!e.state || !e.state.modalOpen) {
+    document.getElementById('modal').classList.remove('open');
+  }
+});
+/* --------------------------------------------------------- */
 
 function render(list){
   gallery.innerHTML='';
@@ -242,21 +271,4 @@ function render(list){
     div.className='card';
     div.id = `photo-${d.id}`;
     div.innerHTML=`<img src="${imgSrc}" loading="lazy" decoding="async" onclick="openModal('${imgSrc}','${d.category}','${d.prompt.replace(/'/g,"\\'")}')"><div class="card-body"><div class="cat">📋 ${d.category}</div><p class="prompt">${d.prompt}</p><div class="actions"><button class="btn btn-copy" onclick="copyPrompt(\`${d.prompt.replace(/`/g,'')}\`)">📋 Copy</button><button class="btn btn-del ${isAdmin()?'show':''}" onclick="deleteCard('${d.id}')">🗑️</button></div></div>`;
-    gallery.appendChild(div);
-  });
-}
-
-function checkDeepLink(){
-  if(deepLinkProcessed) return;
-  const params = new URLSearchParams(window.location.search);
-  const id = params.get('id');
-  if(!id || !allData.length) return;
-  const found = allData.find(p=>p.id===id);
-  if(!found) return;
-  deepLinkProcessed = true;
-  const waitForImages = (maxWait = 4000) => {
-    const startTime = Date.now();
-    const checkInterval = setInterval(() => {
-      const element = document.getElementById(`photo-${id}`);
-      const allImagesLoaded = Array.from(document.querySelectorAll('.card img')).every(img => img.complete);
-    
+    gallery.
