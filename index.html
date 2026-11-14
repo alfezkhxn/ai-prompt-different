@@ -242,7 +242,7 @@ uploadBtn.onclick=async()=>{
 window.copyPrompt=(t)=>{navigator.clipboard.writeText(t); toast('✅ Prompt copied!');};
 window.deleteCard=async(id)=>{if(!isAdmin()) return toast('Admin only'); if(!confirm('Delete?')) return; await deleteDoc(doc(db,'prompts',id)); toast('Deleted'); load();};
 
-/* --- MOBILE BACK BUTTON FIX (Gemini's Logic + Scroll Lock) --- */
+/* --- MOBILE BACK BUTTON FIX --- */
 window.openModal = (img, cat, prompt) => {
   document.getElementById('modalImg').src = img; 
   document.getElementById('modalCat').textContent = cat; 
@@ -251,7 +251,7 @@ window.openModal = (img, cat, prompt) => {
   document.getElementById('modal').classList.add('open'); 
   document.getElementById('modalCopy').onclick = () => copyPrompt(prompt); 
   
-  document.body.classList.add('modal-open'); // Scroll lock
+  document.body.classList.add('modal-open');
   
   const photoId = allData.find(x => (x.imageUrl || x.image) === img)?.id || '';
   window.history.pushState({ modalOpen: true }, "", `?id=${photoId}`);
@@ -275,7 +275,7 @@ window.addEventListener('popstate', (e) => {
     document.body.classList.remove('modal-open');
   }
 });
-/* ------------------------------------------------------------- */
+/* ------------------------------ */
 
 // Render
 function render(list){
@@ -356,4 +356,6 @@ async function load(){
     });
     
     const uniqueCategories = Object.keys(categoryMap).sort();
-    docume
+    document.getElementById('totalCats').textContent = uniqueCategories.length;
+
+    le
